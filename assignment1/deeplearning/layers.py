@@ -170,7 +170,15 @@ def batchnorm_forward(x, gamma, beta, bn_param):
     # the momentum variable to update the running mean and running variance,    #
     # storing your result in the running_mean and running_var variables.        #
     #############################################################################
-    pass
+    batch_mean = np.mean(x,axis=0)
+    batch_var = np.var(x,axis=0)
+    top_center = x-batch_mean
+    bottom_var = np.sqrt(batch_var+eps)
+    x_norm = top_center/bottom_var
+    out = x_hat = gamma*x_norm + beta
+    running_mean = momentum * running_mean + (1 - momentum) * batch_mean
+    running_var = momentum * running_var + (1 - momentum) * batch_var
+    cache = (batch_mean,batch_var,top_center,bottom_var,x_hat,x,gamma,beta,eps)
     #############################################################################
     #                             END OF YOUR CODE                              #
     #############################################################################
@@ -181,7 +189,8 @@ def batchnorm_forward(x, gamma, beta, bn_param):
     # and shift the normalized data using gamma and beta. Store the result in   #
     # the out variable.                                                         #
     #############################################################################
-    pass
+    x_hat = (x-running_mean)/np.sqrt(running_var)
+    out = gamma*x_hat + beta
     #############################################################################
     #                             END OF YOUR CODE                              #
     #############################################################################
@@ -217,7 +226,11 @@ def batchnorm_backward(dout, cache):
   # TODO: Implement the backward pass for batch normalization. Store the      #
   # results in the dx, dgamma, and dbeta variables.                           #
   #############################################################################
-  pass
+  (batch_mean,batch_var,top_center,bottom_var,x_hat,x,gamma,beta,eps) = cache
+  dbeta = np.sum(dout,axis=0)
+  dgamma = np.sum(dout*x_hat,axis=0)
+  dxhat = dout*gamma
+
   #############################################################################
   #                             END OF YOUR CODE                              #
   #############################################################################
