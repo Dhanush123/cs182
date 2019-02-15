@@ -172,13 +172,13 @@ def batchnorm_forward(x, gamma, beta, bn_param):
     #############################################################################
     batch_mean = np.mean(x,axis=0)
     batch_var = np.var(x,axis=0)
-    top_center = x-batch_mean
+    batch_centered = x-batch_mean
     bottom_var = np.sqrt(batch_var+eps)
-    x_norm = top_center/bottom_var
+    x_norm = batch_centered/bottom_var
     out = x_hat = gamma*x_norm + beta
     running_mean = momentum * running_mean + (1 - momentum) * batch_mean
     running_var = momentum * running_var + (1 - momentum) * batch_var
-    cache = (batch_mean,batch_var,top_center,bottom_var,x_hat,x,gamma,beta,eps)
+    cache = (batch_centered,bottom_var,x_norm,gamma,batch_var,eps)
     #############################################################################
     #                             END OF YOUR CODE                              #
     #############################################################################
@@ -226,10 +226,21 @@ def batchnorm_backward(dout, cache):
   # TODO: Implement the backward pass for batch normalization. Store the      #
   # results in the dx, dgamma, and dbeta variables.                           #
   #############################################################################
-  (batch_mean,batch_var,top_center,bottom_var,x_hat,x,gamma,beta,eps) = cache
+  batch_centered,bottom_var,x_norm,gamma,batch_var,eps = cache
   dbeta = np.sum(dout,axis=0)
-  dgamma = np.sum(dout*x_hat,axis=0)
-  dxhat = dout*gamma
+  dxhat = dout
+  dxnorm = gamma * dxhat
+  dgamma = np.sum(x_norm*dxhat,axis=0)
+  dx_xcenter1 = 1.0/bottom_var * dxnorm
+  dbottomvar = np.sum(batch_centered*dxnorm,axis=0)
+  drootvar = -1.0/(bottom_var**2) * dbottomvar
+  dvar = 0.5 * 1.0/np.sqrt(batch_var+eps) * drootvar
+  dsquare = 1.0/(dout.shape[0]*1.0) * np.ones(dout.shape) * dvar
+  dx_xcenter2 = 2 * batch_centered * dsquare
+  dx1 = dx_xcenter1 + dx_xcenter2
+  dmean = -1.0 * np.sum(dx_xcenter1+dx_xcenter2,axis=0)
+  dx2 = 1.0/(dout.shape[0]*1.0) * np.ones(dout.shape) * dmean
+  dx = dx1 + dx2
 
   #############################################################################
   #                             END OF YOUR CODE                              #

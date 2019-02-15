@@ -179,6 +179,11 @@ class FullyConnectedNet(object):
     for l in range(1, L):
       self.params['W' + str(l)] = np.random.randn(all_dims[l-1], all_dims[l]) * weight_scale
       self.params['b' + str(l)] = np.zeros(all_dims[l])
+      print(l,self.params['W' + str(l)].shape,self.params['b' + str(l)].shape)
+      if use_batchnorm and l <= len(hidden_dims):
+        # print("gamma"+str(l),"beta"+str(l))
+        self.params["gamma"+str(l)] = np.ones(hidden_dims[l-1])
+        self.params["beta"+str(l)] = np.zeros(hidden_dims[l-1])
     ############################################################################
     #                             END OF YOUR CODE                             #
     ############################################################################
@@ -240,11 +245,31 @@ class FullyConnectedNet(object):
     caches = []
     L = self.num_layers
     for l in range(1, L):
-      activation_prev = activation
-      activation, cache = affine_relu_forward(activation_prev,self.params['W' + str(l)],self.params['b' + str(l)])
-      caches.append(cache)
+      if self.use_batchnorm:
+        activation, cache = affine_batchnorm_relu_forward(activation,self.params['W' + str(l)],self.params['b' + str(l)],self.params["gamma"+str(l)],self.params["beta"+str(l)],self.bn_params[l-1])
+        caches.append(cache)
+      else:
+        activation, cache = affine_relu_forward(activation,self.params['W' + str(l)],self.params['b' + str(l)])
+
     scores, cache = affine_forward(activation,self.params['W' + str(L)],self.params['b' + str(self.num_layers)])
     caches.append(cache)
+
+    # affine_caches = []
+    # batch_caches = []
+    # relu_caches = []
+    # L = self.num_layers
+    # for l in range(1, L):
+    #   activation_prev = activation
+    #   activation_prev, affine_cache = affine_forward(activation_prev,self.params['W' + str(l)],self.params['b' + str(l)])
+    #   affine_caches.append(affine_cache)
+    #   if self.use_batchnorm and l != self.num_layers:
+    #     activation_prev, batch_cache = batchnorm_forward(activation_prev,self.params["gamma"+str(l)],self.params["beta"+str(l)],self.bn_params[l-1])
+    #     batch_caches.append(batch_cache)
+    #   activation, relu_cache = relu_forward(activation_prev)
+    #   relu_caches.append(relu_cache)
+      
+    # scores, affine_cache = affine_forward(activation,self.params['W' + str(L)],self.params['b' + str(self.num_layers)])
+    # affine_caches.append(affine_cache)
     ############################################################################
     #                             END OF YOUR CODE                             #
     ############################################################################
@@ -268,18 +293,58 @@ class FullyConnectedNet(object):
     # of 0.5 to simplify the expression for the gradient.                      #
     ############################################################################
     L = len(caches)
-    loss, d_last = softmax_loss(scores,y)
+    loss, final_deriv = softmax_loss(scores,y)
     loss += (self.reg/2 * sum([np.sum(np.square(weight)) for weight in self.params.values()]))
+
     current_cache = caches[L-1]
-    current_deriv = d_last
-    current_deriv, grads["W"+str(L)], grads["b"+str(L)] = affine_backward(current_deriv,current_cache)
+    current_deriv = final_deriv
+    current_deriv, dw, grads["b"+str(L)] = affine_backward(current_deriv,current_cache)
+    print(dw.shape,self.params["W"+str(L)].shape)
+    grads["W"+str(L)] = dw + (self.reg * self.params["W"+str(L)])
+    # grads["b"+str(L)] += self.params["b"+str(L)]
     for l in reversed(range(L-1)):
       current_cache = caches[l]
-      current_deriv, grads["W"+str(l+1)], grads["b"+str(l+1)] = affine_relu_backward(current_deriv,current_cache)      
-      grads["W"+str(l+1)] += (self.reg * self.params["W"+str(l+1)])
-      grads["b"+str(l+1)] += (self.reg * self.params["b"+str(l+1)])
+      if self.use_batchnorm:
+        current_deriv,dw,db,grads["gamma"+str(l+1)],grads["beta"+str(l+1)] = affine_batchnorm_relu_backward(current_deriv,current_cache)
+        grads["W"+str(l+1)] = dw + (self.reg * self.params["W"+str(l+1)])
+        grads["b"+str(l+1)] = db
+      else:
+        current_deriv,dw,db = affine_relu_backward(current_deriv, current_cache)
+        grads["W"+str(l+1)] = dw + (self.reg * self.params["W"+str(l+1)])
+        grads["b"+str(l+1)] = db
+      # if self.use_batchnorm:
+      #   current_batchcache = batch_caches[l]
+      # current_deriv, grads["W"+str(l+1)], grads["b"+str(l+1)] = affine_relu_backward(current_deriv,current_cache)      
+      # grads["W"+str(l+1)] += (self.reg * self.params["W"+str(l+1)])
+      # grads["b"+str(l+1)] += (self.reg * self.params["b"+str(l+1)])
+      # if self.use_batchnorm:
+      #   current_batchcache = batch_caches[l]
+      #   current_deriv, grads["gamma"+str(l+1)], grads["beta"+str(l+1)] = batchnorm_backward(current_deriv, current_batchcache)
     ############################################################################
     #                             END OF YOUR CODE                             #
     ############################################################################
 
     return loss, grads
+
+
+def affine_batchnorm_relu_forward(activation,W,b,gamma,beta,param):
+    '''
+    1 layer (affine -> batchnorm -> relu) forward
+    returns activation + cache for each step
+    '''
+    affine_activation, affine_cache = affine_forward(activation,W,b)
+    batch_activation, batch_cache = batchnorm_forward(affine_activation, gamma, beta, param)
+    final_activation, relu_cache = relu_forward(batch_activation)
+    cache = (affine_cache, batch_cache, relu_cache)
+    return final_activation, cache
+
+def affine_batchnorm_relu_backward(deriv,cache):
+    '''
+    1 layer backward (relu -> batchnorm -> affine)
+    returns necessary derivatives
+    '''
+    #cache order is in above foward version of method
+    dx = relu_backward(deriv, cache[2])
+    dx, dgamma, dbeta = batchnorm_backward(dx, cache[1])
+    dx,dw,db = affine_backward(dx, cache[0])
+    return dx, dw, db, dgamma, dbeta
