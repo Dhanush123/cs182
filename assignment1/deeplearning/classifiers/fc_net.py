@@ -252,6 +252,10 @@ class FullyConnectedNet(object):
                 activation, cache = affine_batchnorm_relu_forward(activation, self.params['W'+str(l)], self.params['b'+str(
                     l)], self.params["gamma"+str(l)], self.params["beta"+str(l)], self.bn_params[l-1])
                 caches.append(cache)
+            elif self.use_dropout:
+                activation, cache = affine_relu_dropout_forward(activation, self.params['W'+str(l)], self.params['b'+str(
+                    l)], self.dropout_param)
+                caches.append(cache)
             else:
                 activation, cache = affine_relu_forward(
                     activation, self.params['W'+str(l)], self.params['b'+str(l)])
@@ -292,23 +296,23 @@ class FullyConnectedNet(object):
         current_deriv, dw, grads["b" +
                                  str(L)] = affine_backward(current_deriv, current_cache)
         grads["W"+str(L)] = dw + (self.reg * self.params["W"+str(L)])
-        grads["b"+str(L)] += self.params["b"+str(L)]
+        # grads["b"+str(L)] += self.params["b"+str(L)]
 
         for l in reversed(range(L-1)):
             current_cache = caches[l]
+            dw, db = 0, 0
             if self.use_batchnorm:
                 current_deriv, dw, db, grads["gamma"+str(l+1)], grads["beta"+str(
                     l+1)] = affine_batchnorm_relu_backward(current_deriv, current_cache)
-                grads["W"+str(l+1)] = dw + (self.reg *
-                                            self.params["W"+str(l+1)])
-                grads["b"+str(l+1)] = db
+            elif self.use_dropout:
+                current_deriv, dw, db = affine_relu_dropout_backward(
+                    current_deriv, current_cache)
             else:
                 current_deriv, dw, db = affine_relu_backward(
                     current_deriv, current_cache)
-                grads["W"+str(l+1)] = dw + (self.reg *
-                                            self.params["W"+str(l+1)])
-                grads["b"+str(l+1)] = db
-
+            grads["W"+str(l+1)] = dw + (self.reg *
+                                        self.params["W"+str(l+1)])
+            grads["b"+str(l+1)] = db
         ############################################################################
         #                             END OF YOUR CODE                             #
         ############################################################################
@@ -339,3 +343,26 @@ def affine_batchnorm_relu_backward(deriv, cache):
     dx, dgamma, dbeta = batchnorm_backward(dx, cache[1])
     dx, dw, db = affine_backward(dx, cache[0])
     return dx, dw, db, dgamma, dbeta
+
+
+def affine_relu_dropout_forward(activation, W, b, param):
+    '''
+    1 layer (affine -> relu -> dropout) forward
+    returns activation + cache for each step
+    '''
+    affine_activation, affine_cache = affine_forward(activation, W, b)
+    relu_activation, relu_cache = relu_forward(affine_activation)
+    final_activation, drop_cache = dropout_forward(relu_activation, param)
+    cache = (affine_cache, relu_cache, drop_cache)
+    return final_activation, cache
+
+
+def affine_relu_dropout_backward(deriv, cache):
+    '''
+    1 layer backward (dropout -> relu -> affine)
+    returns necessary derivatives
+    '''
+    dx = dropout_backward(deriv, cache[2])
+    dx = relu_backward(dx, cache[1])
+    dx, dw, db = affine_backward(dx, cache[0])
+    return dx, dw, db
