@@ -47,16 +47,19 @@ class ThreeLayerConvNet(object):
         # hidden affine layer, and keys 'W3' and 'b3' for the weights and biases   #
         # of the output affine layer.                                              #
         ############################################################################
-
-        N, C, H, W = num_filters, input_dim[0], input_dim[1], input_dim[2]
-        self.params['W1'] = np.random.randn(N, C, H, W) * weight_scale
-        self.params['b1'] = np.zeros(N,)
-        # idk W2 yet
-        self.params['W2'] = np.random.randn(1, hidden_dim) * weight_scale
-        self.params['b2'] = np.zeros(hidden_dim,)
+        F, C1, H1, W1 = num_filters, input_dim[0], input_dim[1], input_dim[2]
+        FH = FW = filter_size  # height, width
+        self.params['W1'] = np.random.randn(F, C1, FH, FW) * weight_scale
+        self.params['b1'] = np.zeros(F)
+        # using pooling formula
+        H2, W2 = int((H1-2.0)/2.0)+1, int((W1-2.0)/2.0)+1
+        input_H2 = F*H2*W2
+        self.params['W2'] = np.random.randn(
+            input_H2, hidden_dim) * weight_scale
+        self.params['b2'] = np.zeros(hidden_dim)
         self.params['W3'] = np.random.randn(
             hidden_dim, num_classes) * weight_scale
-        self.params['b3'] = np.zeros(num_classes,)
+        self.params['b3'] = np.zeros(num_classes)
         ############################################################################
         #                             END OF YOUR CODE                             #
         ############################################################################
