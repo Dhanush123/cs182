@@ -262,7 +262,7 @@ class FullyConnectedNet(object):
                 caches.append(cache)
 
         scores, cache = affine_forward(
-            activation, self.params['W' + str(L)], self.params['b' + str(self.num_layers)])
+            activation, self.params['W'+str(L)], self.params['b'+str(self.num_layers)])
         caches.append(cache)
         ############################################################################
         #                             END OF YOUR CODE                             #
@@ -296,7 +296,6 @@ class FullyConnectedNet(object):
         current_deriv, dw, grads["b" +
                                  str(L)] = affine_backward(current_deriv, current_cache)
         grads["W"+str(L)] = dw + (self.reg * self.params["W"+str(L)])
-        # grads["b"+str(L)] += self.params["b"+str(L)]
 
         for l in reversed(range(L-1)):
             current_cache = caches[l]
