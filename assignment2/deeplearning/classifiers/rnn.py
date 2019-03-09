@@ -224,14 +224,20 @@ class CaptioningRNN(object):
         # a loop.                                                                 #
         ###########################################################################
         past_hidden, _ = affine_forward(features, W_proj, b_proj)
+        past_cell = np.zeros(past_hidden.shape)
         word = np.array([self._start] * N)
         captions[:, 0] = self._start
         i = 1
         while i < max_length and np.all(word == self._end):
-            embed_word, _ = word_embedding_forward(word, W_embed)  # 1
+            embed_word, _ = word_embedding_forward(word, W_embed)
             if self.cell_type == "rnn":
                 future_hidden, _ = rnn_step_forward(
                     embed_word, past_hidden, Wx, Wh, b)
+                past_hidden = future_hidden
+            elif self.cell_type == "lstm":
+                future_hidden, future_cell, _ = lstm_step_forward(
+                    embed_word, past_hidden, past_cell, Wx, Wh, b)
+                past_cell = future_cell
                 past_hidden = future_hidden
             scores, _ = affine_forward(future_hidden, W_vocab, b_vocab)
             word = np.argmax(scores, axis=1)
