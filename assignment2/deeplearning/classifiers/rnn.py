@@ -226,8 +226,7 @@ class CaptioningRNN(object):
         past_hidden, _ = affine_forward(features, W_proj, b_proj)
         past_cell = np.zeros(past_hidden.shape)
         word = np.array([self._start] * N)
-        captions[:, 0] = self._start
-        i = 1
+        i = 0
         while i < max_length and np.all(word == self._end):
             embed_word, _ = word_embedding_forward(word, W_embed)
             if self.cell_type == "rnn":
